@@ -1,11 +1,61 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AlertCircle, CheckCircle } from 'lucide-react'
+import { AxiosError } from 'axios'
 import StarRating from '@/components/StarRating'
 import api from '@/services/api'
 import type { FeedbackPayload, SubmissionStatus } from '@/types/feedback'
 
 const MAX_COMMENT_LENGTH = 500
+
+interface ApiErrorResponse {
+  message?: string
+  errors?: Record<string, string[]>
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof AxiosError) {
+    const response = error.response?.data as ApiErrorResponse | undefined
+
+    // Check for validation errors (400)
+    if (error.response?.status === 400) {
+      // Check for specific error messages
+      if (response?.message) {
+        // Map common backend messages to user-friendly ones
+        if (response.message.toLowerCase().includes('rating')) {
+          return 'Please select a rating.'
+        }
+        if (response.message.toLowerCase().includes('comment') &&
+            response.message.toLowerCase().includes('long')) {
+          return 'Comment is too long. Maximum 500 characters allowed.'
+        }
+        // Return the backend message if it seems safe/user-friendly
+        return response.message
+      }
+
+      // Check for field-specific errors
+      if (response?.errors) {
+        const firstError = Object.values(response.errors)[0]
+        if (firstError?.[0]) {
+          return firstError[0]
+        }
+      }
+
+      return 'Please check your input and try again.'
+    }
+
+    // Network or server errors
+    if (error.code === 'ERR_NETWORK') {
+      return 'Network error. Please check your connection and try again.'
+    }
+
+    if (error.response?.status && error.response.status >= 500) {
+      return 'Server error. Please try again later.'
+    }
+  }
+
+  return 'Failed to submit feedback. Please try again.'
+}
 
 function FeedbackPage() {
   const { locationId } = useParams<{ locationId: string }>()
@@ -38,9 +88,9 @@ function FeedbackPage() {
 
       await api.post('/api/v1/feedback', payload)
       setSubmissionStatus('success')
-    } catch {
+    } catch (error) {
       setSubmissionStatus('error')
-      setErrorMessage('Failed to submit feedback. Please try again.')
+      setErrorMessage(getErrorMessage(error))
     }
   }
 

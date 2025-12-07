@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import FeedbackPage from './FeedbackPage'
 import api from '@/services/api'
 
@@ -313,6 +314,130 @@ describe('FeedbackPage', () => {
       // Check that elements are disabled during submission
       expect(submitButton).toBeDisabled()
       expect(screen.getByPlaceholderText(/Optional comment.../i)).toBeDisabled()
+    })
+  })
+
+  describe('Enhanced Error Handling', () => {
+    it('shows specific error for validation errors (400)', async () => {
+      const user = userEvent.setup()
+
+      const axiosError = new AxiosError(
+        'Validation error',
+        'ERR_BAD_REQUEST',
+        undefined,
+        undefined,
+        {
+          status: 400,
+          statusText: 'Bad Request',
+          data: { message: 'Rating is required' },
+          headers: {},
+          config: {} as InternalAxiosRequestConfig,
+        }
+      )
+
+      vi.mocked(api.post).mockRejectedValueOnce(axiosError)
+
+      renderFeedbackPage()
+
+      await user.click(screen.getByRole('button', { name: 'Rate 3 stars' }))
+      await user.click(screen.getByRole('button', { name: /Submit Feedback/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/Please select a rating/i)).toBeInTheDocument()
+      })
+    })
+
+    it('shows specific error for comment too long (400)', async () => {
+      const user = userEvent.setup()
+
+      const axiosError = new AxiosError(
+        'Validation error',
+        'ERR_BAD_REQUEST',
+        undefined,
+        undefined,
+        {
+          status: 400,
+          statusText: 'Bad Request',
+          data: { message: 'Comment is too long' },
+          headers: {},
+          config: {} as InternalAxiosRequestConfig,
+        }
+      )
+
+      vi.mocked(api.post).mockRejectedValueOnce(axiosError)
+
+      renderFeedbackPage()
+
+      await user.click(screen.getByRole('button', { name: 'Rate 5 stars' }))
+      await user.click(screen.getByRole('button', { name: /Submit Feedback/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/Comment is too long. Maximum 500 characters allowed./i)).toBeInTheDocument()
+      })
+    })
+
+    it('shows network error message for network failures', async () => {
+      const user = userEvent.setup()
+
+      const axiosError = new AxiosError(
+        'Network Error',
+        'ERR_NETWORK'
+      )
+
+      vi.mocked(api.post).mockRejectedValueOnce(axiosError)
+
+      renderFeedbackPage()
+
+      await user.click(screen.getByRole('button', { name: 'Rate 4 stars' }))
+      await user.click(screen.getByRole('button', { name: /Submit Feedback/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/Network error. Please check your connection/i)).toBeInTheDocument()
+      })
+    })
+
+    it('shows server error message for 500 errors', async () => {
+      const user = userEvent.setup()
+
+      const axiosError = new AxiosError(
+        'Server error',
+        'ERR_BAD_RESPONSE',
+        undefined,
+        undefined,
+        {
+          status: 500,
+          statusText: 'Internal Server Error',
+          data: {},
+          headers: {},
+          config: {} as InternalAxiosRequestConfig,
+        }
+      )
+
+      vi.mocked(api.post).mockRejectedValueOnce(axiosError)
+
+      renderFeedbackPage()
+
+      await user.click(screen.getByRole('button', { name: 'Rate 2 stars' }))
+      await user.click(screen.getByRole('button', { name: /Submit Feedback/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/Server error. Please try again later./i)).toBeInTheDocument()
+      })
+    })
+
+    it('shows generic error for unknown errors', async () => {
+      const user = userEvent.setup()
+
+      vi.mocked(api.post).mockRejectedValueOnce(new Error('Unknown error'))
+
+      renderFeedbackPage()
+
+      await user.click(screen.getByRole('button', { name: 'Rate 1 star' }))
+      await user.click(screen.getByRole('button', { name: /Submit Feedback/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/Failed to submit feedback. Please try again./i)).toBeInTheDocument()
+      })
     })
   })
 })
