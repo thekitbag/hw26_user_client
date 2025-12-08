@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom'
-import { MessageSquare } from 'lucide-react'
+import logo from '@/assets/harkwise-logo.png'
 
 function Layout() {
   return (
@@ -8,7 +8,12 @@ function Layout() {
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2">
-            <MessageSquare className="w-6 h-6 text-blue-600" />
+            <img
+              src={logo}
+              alt="Harkwise logo"
+              className="w-8 h-8"
+              loading="lazy"
+            />
             <h1 className="text-xl font-semibold text-gray-900">Harkwise</h1>
           </div>
         </div>
